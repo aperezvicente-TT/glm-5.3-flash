@@ -4,7 +4,7 @@ OpenAI-compatible serving of zai-org/GLM-5.3-Flash (321B, 18B active) on Tenstor
 one per 2x4 tray, behind one router. Release 0.1.0 (2026-10-29).
 
 Deploying it from source: the `README.md` and `BUILD-FROM-SOURCE.md` in this repository
-(`github.com/aperezvicente-TT/glm-5.3-flash`).
+(`[github.com/aperezvicente-TT/glm-5.3-flash](https://github.com/aperezvicente-TT/glm-5.3-flash)`).
 
 ## Call it
 

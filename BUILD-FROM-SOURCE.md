@@ -7,10 +7,10 @@ into a serving fleet on a fresh host. No container.
 
 | Component | Repository, branch, tag | Commit | Over |
 |---|---|---|---|
-| tt-metal: the model tree `models/autoports/zai_org_glm_5_3_flash` (the TP8 persistent megakernels, the DRAM-image writer, the device kernels, the vLLM generator) and the ttnn / tt_metal changes it needs | `aperezvicente-TT/tt-metal`, branch `glm53/release-0.1.0`, tag `glm53-flash-0.1.0` | dfd0e5b0ac1 | public tt-metal main dc0b7bea9ad (2026-10-12) |
-| vllm-tt-plugin: the model runner, the admission policy, the LMCache adapter, the self-test | `aperezvicente-TT/vllm-tt-plugin`, branch `glm53/release-0.1.0`, tag `glm53-flash-0.1.0` | 5107a3f | tenstorrent/vllm-tt-plugin a7230306 |
-| LMCache: the TT connector, the capped fs cold tier | `aperezvicente-TT/LMCache`, branch `glm53/release-0.1.0`, tag `glm53-flash-0.1.0` | 93a3baa3 | LMCache/LMCache c9439c65 |
-| this repository: the deployment kit, the router, the converter, the per-tray configuration | `aperezvicente-TT/glm-5.3-flash` | | |
+| tt-metal: the model tree `models/autoports/zai_org_glm_5_3_flash` (the TP8 persistent megakernels, the DRAM-image writer, the device kernels, the vLLM generator) and the ttnn / tt_metal changes it needs | [aperezvicente-TT/tt-metal](https://github.com/aperezvicente-TT/tt-metal), branch `glm53/release-0.1.0`, tag `glm53-flash-0.1.0` | dfd0e5b0ac1 | public tt-metal main dc0b7bea9ad (2026-10-12) |
+| vllm-tt-plugin: the model runner, the admission policy, the LMCache adapter, the self-test | [aperezvicente-TT/vllm-tt-plugin](https://github.com/aperezvicente-TT/vllm-tt-plugin), branch `glm53/release-0.1.0`, tag `glm53-flash-0.1.0` | 5107a3f | tenstorrent/vllm-tt-plugin a7230306 |
+| LMCache: the TT connector, the capped fs cold tier | [aperezvicente-TT/LMCache](https://github.com/aperezvicente-TT/LMCache), branch `glm53/release-0.1.0`, tag `glm53-flash-0.1.0` | 93a3baa3 | LMCache/LMCache c9439c65 |
+| this repository: the deployment kit, the router, the converter, the per-tray configuration | [aperezvicente-TT/glm-5.3-flash](https://github.com/aperezvicente-TT/glm-5.3-flash) | | |
 
 Not in git (large, derived or third party):
 

@@ -17,9 +17,9 @@ The code lives in three release branches, pinned in `VERSIONS`:
 
 | Component | Repository | Branch / tag |
 |---|---|---|
-| tt-metal with the GLM-5.3-Flash model tree and the ttnn operations it adds | `aperezvicente-TT/tt-metal` | `glm53/release-0.1.0`, tag `glm53-flash-0.1.0` |
-| vllm-tt-plugin with the model runner, the admission policy and the LMCache adapter | `aperezvicente-TT/vllm-tt-plugin` | `glm53/release-0.1.0`, tag `glm53-flash-0.1.0` |
-| LMCache with the TT connector and the capped cold tier | `aperezvicente-TT/LMCache` | `glm53/release-0.1.0`, tag `glm53-flash-0.1.0` |
+| tt-metal with the GLM-5.3-Flash model tree and the ttnn operations it adds | [aperezvicente-TT/tt-metal](https://github.com/aperezvicente-TT/tt-metal) | `glm53/release-0.1.0`, tag `glm53-flash-0.1.0` |
+| vllm-tt-plugin with the model runner, the admission policy and the LMCache adapter | [aperezvicente-TT/vllm-tt-plugin](https://github.com/aperezvicente-TT/vllm-tt-plugin) | `glm53/release-0.1.0`, tag `glm53-flash-0.1.0` |
+| LMCache with the TT connector and the capped cold tier | [aperezvicente-TT/LMCache](https://github.com/aperezvicente-TT/LMCache) | `glm53/release-0.1.0`, tag `glm53-flash-0.1.0` |
 
 ## Layout
 
