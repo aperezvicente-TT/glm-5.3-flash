@@ -111,13 +111,17 @@ Two things depend on it; everything else (the JIT-compiled device kernels, the m
 the live device grid at the first launch and needs no manual step.
 
 1. **The tray's chip descriptor** (`topology.yaml`): UMD's cluster descriptor for the 8 chips of the tray, with their
-   harvest masks. It is produced by any device open of the tray: with the tray's `TT_VISIBLE_DEVICES` set (the lock
-   tool's `blk<N>` group exports it), UMD logs
-   `Cluster descriptor serialized to <dir>/cluster_descriptor.yaml`; copy that file as
-   `work-s16/galaxy/step1_blk<N>_<stamp>/topology.yaml`. The kit's first-light check (`glx_block_run.sh <N> '<GO>'
-   scripts/targets/glx_firstlight_k3.sh`) does the open, verifies the 2x4 link topology (2 links per grid edge) and
-   keeps the descriptor and the link report beside it. The descriptor is read by the host mock only; the server reads
-   the live chips.
+   harvest masks. The tt-metal build ships UMD's topology tool; with the tray's chips selected (the lock tool's
+   `blk<N>` group exports `TT_VISIBLE_DEVICES`, or pass the logical ids with `-l`) it writes the descriptor directly:
+
+```
+$R/tt-metal/build_Release/tools/umd/topology -f work-s16/galaxy/step1_blk<N>_<stamp>/topology.yaml
+```
+
+   (Any device open of the tray produces the same file: UMD logs `Cluster descriptor serialized to <path>`.) The
+   kit's first-light check (`glx_block_run.sh <N> '<GO>' scripts/targets/glx_firstlight_k3.sh`) does this, verifies
+   the 2x4 link topology (2 links per grid edge) and keeps the descriptor and the link report beside it. The
+   descriptor is read by the host mock only; the server reads the live chips.
 
 2. **The DRAM image**: the per-chip weight image (26 GB per chip, 8 per tray), laid out against that grid (which DRAM
    bank holds which expert, which core column carries the MLA sync lane). Its id is
