@@ -29,14 +29,14 @@ parameters (`logprobs`, `min_p`, `logit_bias`, `bad_words`, `allowed_token_ids`,
 Through the router, random-token prompts, 1,024 output tokens each. "Users" = fleet-wide concurrency over the four
 trays. Each cell: time to first token (P50), then that user's own decode rate in tokens per second.
 
-| Prompt | 1 user | 4 users | 8 users | 16 users | fleet output at 16 users | returning user (stored context) |
-|---|---|---|---|---|---|---|
-| 128 | 0.20 s, 58 tok/s | 0.25 s, 36 tok/s | 0.34 s, 40 tok/s | 0.35 s, 34 tok/s | 467 tok/s | = cold (nothing to reuse) |
-| 1K | 0.38 s, 58 tok/s | 0.42 s, 40 tok/s | 0.46 s, 39 tok/s | 1.3 s, 35 tok/s | 483 tok/s | = cold (nothing to reuse) |
-| 8K | 2.3 s, 52 tok/s | 4.5 s, 35 tok/s | 4.8 s, 36 tok/s | 7.0 s, 32 tok/s | 343 tok/s | 0.42 s |
-| 32K | 5.3 s, 52 tok/s | 14.9 s, 33 tok/s | 13.8 s, 33 tok/s | 16 s, 29 tok/s | 227 tok/s | 0.61 s |
-| 128K | 27 s, 51 tok/s | 28 s, 42 tok/s | 16 s, 36 tok/s | 19 s, 31 tok/s | 105 tok/s | 1.4 s |
-| 1M | 245 s, 52 tok/s | 245 s, 52 tok/s (one per tray) | 2 per tray: 245 s each, in turn | 4 per tray: 245 s each, in turn | 14 tok/s (prefill-bound) | 8.8 s |
+| Prompt | 1 user | 4 users | 8 users | 16 users | 32 users | fleet output at 16 / 32 users | returning user (stored context) |
+|---|---|---|---|---|---|---|---|
+| 128 | 0.21 s, 58 tok/s | 0.22 s, 58 tok/s | 0.31 s, 39 tok/s | 0.34 s, 35 tok/s | 0.36 s, 30 tok/s | 516 / 880 tok/s | = cold (nothing to reuse) |
+| 1K | 0.39 s, 58 tok/s | 0.41 s, 58 tok/s | 0.50 s, 38 tok/s | 0.50 s, 34 tok/s | 0.56 s, 28 tok/s | 522 / 777 tok/s | = cold (nothing to reuse) |
+| 8K | 1.95 s, 52 tok/s | 1.95 s, 51 tok/s | 1.79 s, 37 tok/s | 3.70 s, 32 tok/s | 11.3 s, 25 tok/s | 410 / 515 tok/s | 0.42 s |
+| 32K | 5.26 s, 52 tok/s | 5.35 s, 51 tok/s | 3.49 s, 36 tok/s | 20.4 s, 25 tok/s | 63.3 s, 22 tok/s | 220 / 237 tok/s | 0.61 s |
+| 128K | 20.8 s, 51 tok/s | 20.9 s, 51 tok/s | 12.6 s, 37 tok/s | 16.4 s, 33 tok/s | 170 s, 30 tok/s | 122 / 115 tok/s | 1.4 s |
+| 1M | 245 s, 52 tok/s | 245 s, 51 tok/s | 2 per tray, in turn | 4 per tray, in turn | 8 per tray, in turn | 14 tok/s at 4 users (prefill-bound) | 8.8 s |
 
 Real-text prompts (AIME) on one tray: 58 tok/s for one user, 38 at 2, 33 at 4, 26.5 at 8 (131 tok/s aggregate per
 tray); a mixed 16-user load with 1M contexts in it decodes at about 21 tok/s per user. Every tray holds 1,048,576
