@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# tt-lock: flock-based reservation of Tenstorrent chip groups on this host.
+#   tt-lock acquire <group> [--owner TEXT] [--ttl HOURS]   # exclusive, non-blocking
+#   tt-lock release <group>
+#   tt-lock status  [<group>]
+#   tt-lock run     <group> -- <cmd...>     # hold lock for the duration, export TT_VISIBLE_DEVICES
+#   tt-lock reset   <group>                 # tt-smi -r on the group's chips; requires the lock + idle box; clears QUIESCE
+#     tt-mgmt viewers never block a reset (tt-kmd zaps their mappings first); $TT_LOCK_DIR/RESETTING marks the window
+#   tt-lock quiesce <group> [why] / unquiesce   # mark the box hot after an unclean device-process death / clear
+# Groups are read from $TT_LOCK_DIR/groups.conf  (lines: name=idx,idx,...).
+set -euo pipefail
+TT_LOCK_DIR=${TT_LOCK_DIR:-/opt/glm53/home/.tt-locks}
+mkdir -p "$TT_LOCK_DIR"
+cmd=${1:-status}; shift || true
+conf="$TT_LOCK_DIR/groups.conf"
+group_chips() { local v; v=$(grep -E "^$1=" "$conf" | head -1 | cut -d= -f2-); case "$v" in RETIRED:*) echo "group $1 is retired: ${v#RETIRED:}" >&2; exit 1;; esac; echo "$v"; }
+lockfile() { echo "$TT_LOCK_DIR/$1.lock"; }
+overlap_held() { # $1=group: print any HELD group sharing a chip with it
+  local g=$1 mine og oc c; mine=",$(group_chips "$g"),"
+  for og in $(cut -d= -f1 "$conf"); do [ "$og" = "$g" ] && continue
+    oc=$(group_chips "$og"); case "$oc" in RETIRED*|"") continue;; esac
+    if ! flock -n "$(lockfile "$og")" true 2>/dev/null; then
+      for c in ${oc//,/ }; do case "$mine" in *",$c,"*) echo "$og"; break;; esac; done; fi; done; }
+owner_of() { [ -f "$(lockfile "$1").owner" ] && cat "$(lockfile "$1").owner" || echo "-"; }
+case "$cmd" in
+  status)
+    for g in $( [ $# -gt 0 ] && echo "$@" || cut -d= -f1 "$conf" ); do
+      lf=$(lockfile "$g")
+      if flock -n "$lf" true 2>/dev/null; then st=free; else st=HELD; fi
+      echo "$g chips=$(group_chips "$g") $st owner=$(owner_of "$g")"
+    done ;;
+  acquire)
+    g=$1; shift; owner="${USER}@$(hostname):$$"; ttl=36
+    while [ $# -gt 0 ]; do case $1 in --owner) owner=$2; shift 2;; --ttl) ttl=$2; shift 2;; *) shift;; esac; done
+    [ -n "$(group_chips "$g")" ] || { echo "unknown group $g" >&2; exit 2; }
+    ov=$(overlap_held "$g"); [ -n "$ov" ] && { echo "refusing: chips of $g are in use via HELD group(s): $ov" >&2; exit 1; }
+    lf=$(lockfile "$g"); exec 9>"$lf"
+    flock -n 9 || { echo "group $g is held by $(owner_of "$g")" >&2; exit 1; }
+    echo "$owner expires=$(date -u -d "+${ttl} hours" +%FT%TZ)" > "$lf.owner"
+    # Keep the lock alive in a background holder process; release with `tt-lock release`.
+    # ($! is unset inside the subshell -> under `set -u` the holder died at once and the lock was never held.)
+    ( exec 9>"$lf"; flock 9; echo $BASHPID > "$lf.pid"; while [ -f "$lf.owner" ]; do sleep 5; done ) &
+    sleep 0.2; echo "acquired $g (chips $(group_chips "$g")) for $owner" ;;
+  release)
+    g=$1; lf=$(lockfile "$g"); rm -f "$lf.owner"; sleep 0.3
+    [ -f "$lf.pid" ] && { kill "$(cat "$lf.pid")" 2>/dev/null || true; rm -f "$lf.pid"; }
+    echo "released $g" ;;
+  quiesce)
+    # Mark the box "hot": a device process died without closing its device (abort/SIGKILL/timeout/OOM). New device
+    # processes must not start until the affected card has been reset on an idle box (tt-lock reset clears the flag).
+    g=${1:-unknown}; echo "$(date -u +%FT%TZ) $g ${2:-}" >> "$TT_LOCK_DIR/QUIESCE"; echo "box quiesced (card $g): no new device processes until reset"; ;;
+  unquiesce) rm -f "$TT_LOCK_DIR/QUIESCE"; echo "quiesce flag cleared" ;;
+  run)
+    g=$1; shift; [ "${1:-}" = "--" ] && shift
+    if [ -f "$TT_LOCK_DIR/QUIESCE" ]; then echo "refusing to start a device process: box is QUIESCED ($(tail -1 "$TT_LOCK_DIR/QUIESCE")) — wait for the reset" >&2; exit 4; fi
+    # Resolve the chips before locking: inside `export X=$(...)` a retired group's failure is masked and the command
+    # used to run with an empty TT_VISIBLE_DEVICES under the retired group's lock (tt-lang L1, 2026-10-15).
+    chips=$(group_chips "$g"); [ -n "$chips" ] || { echo "unknown group $g" >&2; exit 2; }
+    ov=$(overlap_held "$g"); [ -n "$ov" ] && { echo "refusing: chips of $g are in use via HELD group(s): $ov" >&2; exit 1; }
+    lf=$(lockfile "$g"); exec 9>"$lf"; flock -n 9 || { echo "group $g is held by $(owner_of "$g")" >&2; exit 1; }
+    echo "${USER}@$(hostname):$$ (run)" > "$lf.owner"; trap 'rm -f "$lf.owner"' EXIT
+    export TT_VISIBLE_DEVICES=$chips; export TT_LOCK_GROUP=$g
+    "$@" ;;
+  reset)
+    g=$1; lf=$(lockfile "$g")
+    if flock -n "$lf" true 2>/dev/null; then echo "refusing: acquire $g first" >&2; exit 1; fi
+    # QUIESCENCE RULE (2026-10-16): a warm reset re-enumerates PCI; doing it while another card is under load has
+    # coincided with host death. Refuse unless no other group is HELD and no process holds any /dev/tenstorrent node.
+    for og in $(cut -d= -f1 "$conf"); do [ "$og" = "$g" ] && continue
+      olf=$(lockfile "$og"); if ! flock -n "$olf" true 2>/dev/null; then echo "refusing reset of $g: group $og is HELD by $(owner_of "$og") — wait until every other card is idle" >&2; exit 3; fi; done
+    # lsof exits 1 when nothing holds the nodes; under pipefail that aborted the reset silently (rc=1) on an idle box (2026-10-17)
+    holders=$(lsof /dev/tenstorrent/* 2>/dev/null | awk 'NR>1{print $1"/"$2}' | sort -u | tr '\n' ' ' || true)
+    # Telemetry viewers (tt-mgmt) are exempt from the holder check (operator decision 2026-10-17). This is safe with the
+    # installed tt-kmd 2.11.1-pre: RESET_DEVICE takes reset_rwsem exclusive, bumps the reset generation, zaps every other
+    # fd's VMAs (tenstorrent_vma_zap) and reclaims their TLB windows BEFORE the chip is disturbed, and pre-reset fds are
+    # permanently invalid afterwards (mmap/ioctl -> -ENODEV). A viewer's mapped window therefore cannot reach the bus
+    # mid-reset; the viewer just has to reopen. (SIGSTOP-freezing was tried and rejected: it hands the shell back to the
+    # operator and the resumed TUI stops again on SIGTTIN.) Anything else holding a node (a workload) still blocks.
+    viewers=$(tr ' ' '\n' <<<"$holders" | awk -F/ '$1=="tt-mgmt"{print $2}' | tr '\n' ' ' || true)
+    others=$(tr ' ' '\n' <<<"$holders" | awk -F/ '$1!="tt-mgmt" && NF{print}' | tr '\n' ' ' || true)
+    others=$(echo $others); viewers=$(echo $viewers)
+    if [ -n "$others" ]; then echo "refusing reset of $g: device nodes are open by: $others" >&2; exit 3; fi
+    chips=$(group_chips "$g"); echo "$(date -u +%FT%TZ) reset $g chips=$chips by ${USER}@$(hostname):$$ viewers=[$viewers]" >> "$TT_LOCK_DIR/reset.journal"
+    trap 'rm -f "$TT_LOCK_DIR/RESETTING"' EXIT
+    echo "$g chips=$chips since=$(date -u +%FT%TZ)" > "$TT_LOCK_DIR/RESETTING"
+    TTSMI=$(command -v tt-smi || true); [ -n "$TTSMI" ] || TTSMI="$HOME/.local/bin/tt-smi"   # non-interactive shells lack ~/.local/bin
+    echo "$TTSMI -r $chips"; rc=0; env -u TT_VISIBLE_DEVICES "$TTSMI" -r "$chips" || rc=$?
+    echo "$(date -u +%FT%TZ) reset $g done rc=$rc" >> "$TT_LOCK_DIR/reset.journal"
+    [ $rc -eq 0 ] && rm -f "$TT_LOCK_DIR/QUIESCE"; rm -f "$TT_LOCK_DIR/RESETTING"; trap - EXIT; exit $rc ;;
+  *) echo "usage: tt-lock {status|acquire|release|run|reset} <group> ..." >&2; exit 2 ;;
+esac

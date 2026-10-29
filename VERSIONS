@@ -1,0 +1,15 @@
+# GLM-5.3-Flash on Blackhole, release 0.1.0 (2026-10-29)
+# component            repository                              branch / tag                          commit        over (public base)
+tt-metal               aperezvicente-TT/tt-metal               glm53/release-0.1.0  glm53-flash-0.1.0  dfd0e5b0ac1   tenstorrent/tt-metal main dc0b7bea9ad (2026-10-12)
+  submodule umd                                                                                      538094128060
+  submodule tt-cluster-descriptors                                                                   9bcf698e971a
+  submodule tracy                                                                                    9c3ca7e5fe48
+vllm-tt-plugin         aperezvicente-TT/vllm-tt-plugin         glm53/release-0.1.0  glm53-flash-0.1.0  5107a3f       tenstorrent/vllm-tt-plugin a7230306
+LMCache                aperezvicente-TT/LMCache                glm53/release-0.1.0  glm53-flash-0.1.0  93a3baa3      LMCache/LMCache c9439c65 (2026-07-16)
+vllm                   pypi                                    0.26.0
+torch                  pypi (cpu)                              2.11.0
+transformers           pypi                                    5.16.1
+python                                                          3.10
+model weights          huggingface zai-org/GLM-5.3-Flash       snapshot eb9eb208eb0d988989d07a6a12d0fdeb5f52574a
+serving configuration  deploy/envjobs/f2i3d6_blk{0..3}_env.json (four identical plain trays, 1,048,576-token pools)
+router                 router/dp4router.py                     v6f

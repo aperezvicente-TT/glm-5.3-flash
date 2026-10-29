@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# tt-lock for the Galaxy (program 2026-10-26T22:26:39Z (1); preparation only, no device opens before the operator's
+# first-light GO). A wrapper around the program's .agents/scripts/tt-lock (the same flock groups, owners, TTL, run) with the
+# shared-box rules:
+#   - groups: blk<b> = the 8 devices of 2x4 block b (16's carving: devices 8b .. 8b+7 in /dev/tenstorrent numbering), all = the
+#     32; generated into $TT_LOCK_DIR/groups.conf on first use (edit there if 16's carving maps differently);
+#   - before EVERY acquire / run: no process outside this user may hold a /dev/tenstorrent node of the group (lsof); other
+#     users' holders -> refuse, naming them;
+#   - reset: ALWAYS refused (no resets on the shared box without the operator);
+#   - quiesce / status / release: delegated unchanged.
+# usage: tt-lock-galaxy {status|acquire|release|run} <group> ...   (TT_LOCK_DIR default /opt/glm53/locks)
+set -u
+export TT_LOCK_DIR=${TT_LOCK_DIR:-/opt/glm53/locks}
+TTLOCK=${TTLOCK:-$(dirname "$(readlink -f "$0")")/../../../../.agents/scripts/tt-lock}
+mkdir -p "$TT_LOCK_DIR"
+conf=$TT_LOCK_DIR/groups.conf
+if [ ! -s "$conf" ]; then
+  for b in 0 1 2 3; do echo "blk$b=$(seq -s, $((8 * b)) $((8 * b + 7)))"; done > "$conf.tmp"
+  echo "all=$(seq -s, 0 31)" >> "$conf.tmp" && mv "$conf.tmp" "$conf"
+fi
+cmd=${1:-}; g=${2:-}
+case "$cmd" in
+  reset) echo "tt-lock-galaxy: resets are not allowed on the shared Galaxy without the operator" >&2; exit 3;;
+  acquire|run)
+    chips=$(grep -E "^$g=" "$conf" | head -1 | cut -d= -f2-); [ -n "$chips" ] || { echo "unknown group $g" >&2; exit 2; }
+    others=""
+    for c in ${chips//,/ }; do
+      [ -e /dev/tenstorrent/$c ] || { echo "tt-lock-galaxy: /dev/tenstorrent/$c missing (carving mismatch?)" >&2; exit 4; }
+      others="$others $(lsof -F pu /dev/tenstorrent/$c 2>/dev/null | awk -v me="$(id -u)" '/^p/{p=substr($0,2)} /^u/{u=substr($0,2); if (u != me) print "pid" p "/uid" u}')"
+    done
+    others=$(echo $others | tr ' ' '\n' | sort -u | tr '\n' ' ')
+    [ -z "${others// /}" ] || { echo "tt-lock-galaxy: refusing $g: other users hold its devices: $others" >&2; exit 1; };;
+esac
+exec "$TTLOCK" "$@"
