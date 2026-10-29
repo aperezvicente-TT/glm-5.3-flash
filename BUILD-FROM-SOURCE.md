@@ -104,20 +104,50 @@ python $R/glm53-flash-bringup/weights/verify_cache.py   # against weights/manife
    About 23 minutes on a 128-core host. The fused-experts cache (`GLM53_FUSED_EXPERTS_CACHE`, 107 GB) is derived
    from the tile cache by the model on its first load (the per-core `[gate_c | up_c]` tile permutation).
 
-## 5. DRAM images (one device job per harvest layout)
+## 5. Harvest-dependent artifacts: the chip descriptor and the DRAM image (per tray)
 
-The engine does not load safetensors at start. It DMAs a per-chip image (26 GB per chip, 8 per block) laid out
-against the exact grid of the chips it was built on: which DRAM bank holds which expert, which core column
-carries the MLA sync lane. The image id (for example `fde4697e51b2-tp-ds-v1-2x4-629a5c1a384e`) ends in the hash
-of the block's chip descriptor. A block whose chips have a different harvest mask cannot use it.
+Every Blackhole chip has its own harvest mask (which Tensix rows, DRAM banks and Ethernet channels are fused off).
+Two things depend on it; everything else (the JIT-compiled device kernels, the megakernel placement) is derived from
+the live device grid at the first launch and needs no manual step.
 
-- This box has two layouts: trays 1 and 2 share `629a5c1a384e`, trays 3 and 4 share `1530493535ed`.
-- A new box builds its own: launch one block in build mode (`GLM53_LAUNCH_WEIGHTS=build`; the server finds no
-  image under `GLM53_TP_IMAGE_ROOT`, loads the tile cache and writes the image, `tt/tp_image.py
-  build_or_restore`), once per distinct layout, about 30 minutes each. Build mode never pulls an image.
-- Then run the host-only image mock per block (`GLX_MOCK_IMAGE_ROOT=<root> GLX_TAG=<tag>dp4b<N> GLX_PD_ROLE=H
-  bash glx_image_mock.sh <pin> <that block's step-1 descriptor> <port>`); its verdict file next to the image is
-  what the fleet launcher checks. A block with no verdict is refused.
+1. **The tray's chip descriptor** (`topology.yaml`): UMD's cluster descriptor for the 8 chips of the tray, with their
+   harvest masks. It is produced by any device open of the tray: with the tray's `TT_VISIBLE_DEVICES` set (the lock
+   tool's `blk<N>` group exports it), UMD logs
+   `Cluster descriptor serialized to <dir>/cluster_descriptor.yaml`; copy that file as
+   `work-s16/galaxy/step1_blk<N>_<stamp>/topology.yaml`. The kit's first-light check (`glx_block_run.sh <N> '<GO>'
+   scripts/targets/glx_firstlight_k3.sh`) does the open, verifies the 2x4 link topology (2 links per grid edge) and
+   keeps the descriptor and the link report beside it. The descriptor is read by the host mock only; the server reads
+   the live chips.
+
+2. **The DRAM image**: the per-chip weight image (26 GB per chip, 8 per tray), laid out against that grid (which DRAM
+   bank holds which expert, which core column carries the MLA sync lane). Its id is
+   `<weights id>-tp-ds-v1-<rows>x<cols>-<map sha>`; the 12-hex `map sha` is the hash of the per-chip row map the
+   server derives from the harvest masks (`tt/tp_image.py`), so trays with the same masks share an image and trays
+   with different masks cannot. The reference box has two layouts (`629a5c1a384e` on trays 1 and 2,
+   `1530493535ed` on trays 3 and 4). Build one image per distinct layout, on the tray's own chips:
+
+```
+GLM53_LAUNCH_WEIGHTS=build GLM53_TP_IMAGE_ROOT=$R/data/dram_images/tp14b_int27 \
+  bash doc/ttnn/09-vllm/replicate/glx_block_run.sh <N> '<GO line>'      # the resident target of the form
+```
+
+   The server finds no image under the root, loads the tile cache and writes the image there
+   (`tt/tp_image.py build_or_restore`; about 30 minutes; build mode never pulls an existing image). The result is
+   `<root>/<id>/` with 8 chip files and `manifest.json` carrying the `map_sha`; a later launch on a tray whose map
+   sha differs refuses the image (`ImageMismatch`).
+
+3. **The host mock per tray** validates the image against the tray's descriptor without opening a device:
+
+```
+GLX_MOCK_IMAGE_ROOT=<root> GLX_TAG=<form tag>dp4b<N> GLX_PD_ROLE=H \
+  bash doc/ttnn/09-vllm/replicate/glx_image_mock.sh <image id> work-s16/galaxy/step1_blk<N>_<stamp>/topology.yaml 1835<N>
+```
+
+   It writes `mock_verdict_glx_<tag>dp4b<N>pdH.json` next to the image. The fleet launcher refuses a tray without a
+   passing verdict for its form.
+
+4. **The tray-to-image map**: `work-s9/dp4_images.conf`, one line per tray `<N> <image root> <image id>`; trays
+   with the same layout point at the same image.
 
 ## 6. Bring the fleet up
 
