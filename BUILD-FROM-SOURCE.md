@@ -110,6 +110,11 @@ Every Blackhole chip has its own harvest mask (which Tensix rows, DRAM banks and
 Two things depend on it; everything else (the JIT-compiled device kernels, the megakernel placement) is derived from
 the live device grid at the first launch and needs no manual step.
 
+0. **The tray map**: `deploy/tt-lock` reserves a chip group per process and exports its `TT_VISIBLE_DEVICES`;
+   `tt-lock-galaxy` wraps it for a shared box (holder checks, no resets). Write the groups once per box in
+   `$TT_LOCK_DIR/groups.conf`, one line per tray with its UMD logical chip ids, e.g. `blk0=0,1,2,3,4,5,6,7` ...
+   `blk3=24,...,31`, plus `all=0-31`. Every launcher below takes the tray's chips from that file.
+
 1. **The tray's chip descriptor** (`topology.yaml`): UMD's cluster descriptor for the 8 chips of the tray, with their
    harvest masks. The tt-metal build ships UMD's topology tool; with the tray's chips selected (the lock tool's
    `blk<N>` group exports `TT_VISIBLE_DEVICES`, or pass the logical ids with `-l`) it writes the descriptor directly:

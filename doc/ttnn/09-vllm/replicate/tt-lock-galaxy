@@ -11,7 +11,7 @@
 # usage: tt-lock-galaxy {status|acquire|release|run} <group> ...   (TT_LOCK_DIR default /opt/glm53/locks)
 set -u
 export TT_LOCK_DIR=${TT_LOCK_DIR:-/opt/glm53/locks}
-TTLOCK=${TTLOCK:-$(dirname "$(readlink -f "$0")")/../../../../.agents/scripts/tt-lock}
+TTLOCK=${TTLOCK:-$(dirname "$(readlink -f "$0")")/../../../../deploy/tt-lock}
 mkdir -p "$TT_LOCK_DIR"
 conf=$TT_LOCK_DIR/groups.conf
 if [ ! -s "$conf" ]; then

@@ -28,7 +28,7 @@ BUILD-FROM-SOURCE.md          build, convert, image, bring-up
 GETTING-STARTED.md            calling the endpoint, operating a fleet
 VERSIONS                      the pinned commits of every component
 env.sh                        the program environment (paths; edit for your host)
-.agents/scripts/tt-lock       the device lock tool (one holder per chip group)
+deploy/tt-lock                the device lock tool (one holder per chip group; groups.conf maps trays to chips)
 doc/ttnn/09-vllm/replicate/   the fleet kit: prepare, tree, image mock, block launch, dp4 up / stop, env jobs
 doc/ttnn/09-vllm/scripts/     the server launcher, the serving window, the host mock, the chat template, checks
 deploy/envjobs/               the per-tray serving configuration of record (release 0.1.0, four plain 1M trays)
