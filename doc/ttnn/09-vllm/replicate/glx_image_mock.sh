@@ -31,7 +31,7 @@ NTD=/opt/glm53/kit/.agents/scripts/no-tt-devices
 TAG=${GLX_TAG:-n29h7p2hk3}; VNAME=mock_verdict_glx.json; [ $TAG = n29h7p2hk3 ] || VNAME=mock_verdict_glx_$TAG.json
 ROLE=${GLX_PD_ROLE:-}; case "$ROLE" in ""|P|D|H) ;; *) echo "GLX_PD_ROLE=$ROLE (P, D or H: the fleet's HYBRID tray)"; exit 2;; esac
 [ -n "$ROLE" ] && VNAME=mock_verdict_glx_${TAG}pd$ROLE.json
-# the target is read from the host checkout ($R_WS): this check runs OUTSIDE the namespace, where /mnt/fab does not exist
+# the target is read from the host checkout ($R_WS): this check runs OUTSIDE the namespace, where the share mount does not exist
 # (program 2026-10-27T04:01:01Z (1))
 TH=$R_WS/doc/ttnn/09-vllm/scripts/targets/int27${TAG}_resident.sh
 [ -f $TH ] || { echo "no target $TH"; exit 2; }
