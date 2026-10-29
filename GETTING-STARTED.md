@@ -27,17 +27,16 @@ parameters (`logprobs`, `min_p`, `logit_bias`, `bad_words`, `allowed_token_ids`,
 ## What to expect
 
 Through the router, random-token prompts, 1,024 output tokens each. "Users" = fleet-wide concurrency over the four
-trays. TTFT = time to first token (P50); tok/s per user = that user's own decode rate; fleet output = all users' output
-tokens per second, wall time including prefills.
+trays. Each cell: time to first token (P50), then that user's own decode rate in tokens per second.
 
-| Prompt | 1 user TTFT | tok/s per user | 4 users TTFT | tok/s per user | 8 users TTFT | tok/s per user | 16 users TTFT | tok/s per user | fleet output tok/s at 16 users | returning user TTFT (stored context) |
-|---|---|---|---|---|---|---|---|---|---|---|
-| 128 | 0.20 s | 58 | 0.25 s | 36 | 0.34 s | 40 | 0.35 s | 34 | 467 | |
-| 1K | 0.38 s | 58 | 0.42 s | 40 | 0.46 s | 39 | 1.3 s | 35 | 483 | |
-| 8K | 2.3 s | 52 | 4.5 s | 35 | 4.8 s | 36 | 7.0 s | 32 | 343 | 0.42 s |
-| 32K | 5.3 s | 52 | 14.9 s | 33 | 13.8 s | 33 | 16 s | 29 | 227 | 0.61 s |
-| 128K | 27 s | 51 | 28 s | 42 | 16 s | 36 | 19 s | 31 | 105 | 1.4 s |
-| 1M | about 270 s | 52 | one per tray | 52 | | | | | | 8.8 s |
+| Prompt | 1 user | 4 users | 8 users | 16 users | fleet output at 16 users | returning user (stored context) |
+|---|---|---|---|---|---|---|
+| 128 | 0.20 s, 58 tok/s | 0.25 s, 36 tok/s | 0.34 s, 40 tok/s | 0.35 s, 34 tok/s | 467 tok/s | |
+| 1K | 0.38 s, 58 tok/s | 0.42 s, 40 tok/s | 0.46 s, 39 tok/s | 1.3 s, 35 tok/s | 483 tok/s | |
+| 8K | 2.3 s, 52 tok/s | 4.5 s, 35 tok/s | 4.8 s, 36 tok/s | 7.0 s, 32 tok/s | 343 tok/s | 0.42 s |
+| 32K | 5.3 s, 52 tok/s | 14.9 s, 33 tok/s | 13.8 s, 33 tok/s | 16 s, 29 tok/s | 227 tok/s | 0.61 s |
+| 128K | 27 s, 51 tok/s | 28 s, 42 tok/s | 16 s, 36 tok/s | 19 s, 31 tok/s | 105 tok/s | 1.4 s |
+| 1M | ~270 s, 52 tok/s | one per tray | | | | 8.8 s |
 
 Real-text prompts (AIME) on one tray: 58 tok/s for one user, 38 at 2, 33 at 4, 26.5 at 8 (131 tok/s aggregate per
 tray); a mixed 16-user load with 1M contexts in it decodes at about 21 tok/s per user. Every tray holds 1,048,576
